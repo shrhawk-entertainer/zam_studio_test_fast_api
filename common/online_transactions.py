@@ -30,7 +30,7 @@ class OnlineTransaction(object):
             'security_code': self.security_code
         }
 
-    def make_transaction(self, transaction_class=None):
+    async def make_transaction(self, transaction_class=None):
         """
         Online PaymentGateway flow
         :param transaction_class:
@@ -49,18 +49,18 @@ class OnlineTransaction(object):
             self.response = {'status_code': UNPROCESSABLE_ENTITY_CODE, 'data': UNPROCESSABLE_ENTITY_MESSAGE}
             return self.response
 
-        if self.transaction_class and self.transaction_class.check_availability():
-            self.response = self.transaction_class.make_transaction(data=self.request_data)
+        if self.transaction_class and await self.transaction_class.check_availability():
+            self.response = await self.transaction_class.make_transaction(data=self.request_data)
             # if the ExpensivePaymentGateway is busy or something went wrong try with
             # CheapPaymentGateway
             if self.is_expensive_gate_away and self.response['status_code'] in STATUS_FORCE_LIST:
                 self.is_expensive_gate_away = False
-                return self.make_transaction(transaction_class=CheapPaymentGateway())
+                return await self.make_transaction(transaction_class=CheapPaymentGateway())
         else:
             # if the ExpensivePaymentGateway is not available try with CheapPaymentGateway
             if self.is_expensive_gate_away:
                 self.is_expensive_gate_away = False
-                return self.make_transaction(transaction_class=CheapPaymentGateway())
+                return await self.make_transaction(transaction_class=CheapPaymentGateway())
             else:
                 self.response = {'status_code': UNAVAILABLE_STATUS_CODE, 'data': UNAVAILABLE_MESSAGE}
         return self.response
@@ -77,12 +77,12 @@ class BasePaymentGateway(object):
     }
     retries = 0
 
-    def check_availability(self):
+    async def check_availability(self):
         """
         Verify the payment gateway availability
         :return: bool
         """
-        response = make_request(api_url=self.availability_url, api_key=self.api_key)
+        response = await make_request(api_url=self.availability_url, api_key=self.api_key)
         return response['status_code'] == 200
 
 
@@ -92,13 +92,13 @@ class CheapPaymentGateway(BasePaymentGateway):
     availability_url = api_url + '/availability/'
     transaction_url = api_url + '/transaction/'
 
-    def make_transaction(self, data={}):
+    async def make_transaction(self, data={}):
         """
         Perform CheapPaymentGateway transaction request
         :param data:
         :return:
         """
-        response = make_request(
+        response = await make_request(
             method='post',
             api_url=self.transaction_url,
             api_key=self.api_key,
@@ -116,13 +116,13 @@ class ExpensivePaymentGateway(BasePaymentGateway):
     availability_url = api_url + '/availability/'
     transaction_url = api_url + '/transaction/'
 
-    def make_transaction(self, data={}):
+    async def make_transaction(self, data={}):
         """
         Perform ExpensivePaymentGateway transaction request
         :param data:
         :return:
         """
-        response = make_request(
+        response = await make_request(
             method='post',
             api_url=self.transaction_url,
             api_key=self.api_key,
@@ -141,13 +141,13 @@ class PremiumPaymentGateway(BasePaymentGateway):
     transaction_url = api_url + '/transaction/'
     retries = 3
 
-    def make_transaction(self, data={}):
+    async def make_transaction(self, data={}):
         """
         Perform PremiumPaymentGateway transaction request
         :param data:
         :return:
         """
-        response = make_request(
+        response = await make_request(
             method='post',
             api_url=self.transaction_url,
             api_key=self.api_key,

@@ -1,5 +1,7 @@
 import datetime
-from unittest.mock import patch
+
+import asynctest
+import pytest
 
 from common.online_transactions import OnlineTransaction
 
@@ -9,7 +11,8 @@ class TestPaymentGateWay(object):
     Tests for Payment-GateWays
     """
 
-    def test_cheap_payment_gateway(self):
+    @pytest.mark.asyncio
+    async def test_cheap_payment_gateway(self):
         """
         Test cheap payment gateway response.
         """
@@ -20,12 +23,13 @@ class TestPaymentGateWay(object):
             12,
             security_code=321
         )
-        result = transaction_flow.make_transaction()
+        result = await transaction_flow.make_transaction()
         assert result['status_code'] == 200
         assert result['data'] == 'ok'
 
-    @patch('common.online_transactions.CheapPaymentGateway.make_transaction')
-    def test_cheap_payment_gateway_using_function_calling(self, make_transaction):
+    @pytest.mark.asyncio
+    @asynctest.patch('common.online_transactions.CheapPaymentGateway.make_transaction')
+    async def test_cheap_payment_gateway_using_function_calling(self, make_transaction):
         """
         Test cheap payment gateway called with their own class make_transaction function
         """
@@ -36,10 +40,11 @@ class TestPaymentGateWay(object):
             12,
             security_code=321
         )
-        transaction_flow.make_transaction()
+        await transaction_flow.make_transaction()
         make_transaction.assert_called_once()
 
-    def test_premium_payment_gateway(self):
+    @pytest.mark.asyncio
+    async def test_premium_payment_gateway(self):
         """
         Test premium payment gateway response.
         """
@@ -50,12 +55,13 @@ class TestPaymentGateWay(object):
             521,  # premium amount
             security_code=321
         )
-        result = transaction_flow.make_transaction()
+        result = await transaction_flow.make_transaction()
         assert result['status_code'] == 200
         assert result['data'] == 'ok'
 
-    @patch('common.online_transactions.PremiumPaymentGateway.make_transaction')
-    def test_premium_payment_gateway_using_function_calling(self, make_transaction):
+    @pytest.mark.asyncio
+    @asynctest.patch('common.online_transactions.PremiumPaymentGateway.make_transaction')
+    async def test_premium_payment_gateway_using_function_calling(self, make_transaction):
         """
         Test premium payment gateway called with their own class make_transaction function
         """
@@ -66,13 +72,14 @@ class TestPaymentGateWay(object):
             521,  # premium amount
             security_code=321
         )
-        transaction_flow.make_transaction()
+        await transaction_flow.make_transaction()
         make_transaction.assert_called_once()
 
-    @patch('common.online_transactions.make_request', side_effect=[
+    @pytest.mark.asyncio
+    @asynctest.patch('common.online_transactions.make_request', side_effect=[
         {'data': 'ok', 'status_code': 200}, {'data': 'ok', 'status_code': 200}
     ])
-    def test_premium_payment_gateway_retries(self, make_request):
+    async def test_premium_payment_gateway_retries(self, make_request):
         """
         Test premium payment gateway with retries
         """
@@ -83,12 +90,13 @@ class TestPaymentGateWay(object):
             521,  # premium amount
             security_code=321
         )
-        transaction_flow.make_transaction()
+        await transaction_flow.make_transaction()
         #  second call with transaction call contains retries
         args, kwargs = make_request.call_args_list[1]
         assert kwargs['retries'] == 3
 
-    def test_expensive_payment_gateway(self):
+    @pytest.mark.asyncio
+    async def test_expensive_payment_gateway(self):
         """
         Test expensive payment gateway response.
         """
@@ -99,12 +107,13 @@ class TestPaymentGateWay(object):
             450,  # expensive amount
             security_code=321
         )
-        result = transaction_flow.make_transaction()
+        result = await transaction_flow.make_transaction()
         assert result['status_code'] == 200
         assert result['data'] == 'ok'
 
-    @patch('common.online_transactions.ExpensivePaymentGateway.make_transaction')
-    def test_expensive_payment_gateway_using_function_calling(self, make_transaction):
+    @pytest.mark.asyncio
+    @asynctest.patch('common.online_transactions.ExpensivePaymentGateway.make_transaction')
+    async def test_expensive_payment_gateway_using_function_calling(self, make_transaction):
         """
         Test expensive payment gateway called with their own class make_transaction function
         """
@@ -115,16 +124,17 @@ class TestPaymentGateWay(object):
             450,  # expensive amount
             security_code=321
         )
-        transaction_flow.make_transaction()
+        await transaction_flow.make_transaction()
         make_transaction.assert_called_once()
 
-    @patch('common.online_transactions.make_request', side_effect=[
+    @pytest.mark.asyncio
+    @asynctest.patch('common.online_transactions.make_request', side_effect=[
         {'data': 'ok', 'status_code': 500}, {'data': 'ok', 'status_code': 200}, {'data': 'ok', 'status_code': 200}
     ])
-    @patch('common.online_transactions.CheapPaymentGateway.make_transaction', side_effect=[
+    @asynctest.patch('common.online_transactions.CheapPaymentGateway.make_transaction', side_effect=[
         {'data': 'ok', 'status_code': 200}
     ])
-    def test_expensive_payment_failure(self, make_transaction, make_request):
+    async def test_expensive_payment_failure(self, make_transaction, make_request):
         """
         Test expensive payment gateway failure with cheap payment gateway
         first side effect will throw failure that expensive_payment is unavailable and move to cheap payment gateway
@@ -136,7 +146,7 @@ class TestPaymentGateWay(object):
             450,  # expensive amount
             security_code=321
         )
-        result = transaction_flow.make_transaction()
+        result = await transaction_flow.make_transaction()
         make_transaction.assert_called_once()
         assert result['status_code'] == 200
         assert result['data'] == 'ok'
