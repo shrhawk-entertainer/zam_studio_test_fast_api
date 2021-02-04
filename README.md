@@ -16,11 +16,11 @@ $ sh scripts/install_requirements.sh
 ```
 4. Run flask API:
 ```shell
-$ python app.py
+$ python main.py
 ```
 5. Url:
 ```
-http://0.0.0.0:5051/api/v1/process-payment/ (post)
+http://0.0.0.0:8000/api/v1/process-payment/ (post)
 ```
 6. In order to Run tests:
 ```
