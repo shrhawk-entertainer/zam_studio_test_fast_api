@@ -4,8 +4,9 @@ import json
 import httpretty
 import httpx
 import respx
+from tenacity import AsyncRetrying, RetryError, stop_after_attempt, wait_fixed
 
-from common.constants import DEBUG_MODE, INTERNAL_SERVER_ERROR_MESSAGE
+from common.constants import DEBUG_MODE, INTERNAL_SERVER_ERROR_MESSAGE, INTERNAL_SERVER_STATUS_CODE, STATUS_FORCE_LIST
 
 MOCK_URLS = {
     'https://cheap-payment-gateway/api/v1/availability/': {'data': 'ok', 'status_code': 200},
@@ -75,16 +76,18 @@ async def make_request(method='get', api_url='', api_key='', data={}, retries=0)
         event_hooks = {'request': [log_request], 'response': [log_response]}
     async with httpx.AsyncClient(event_hooks=event_hooks) as client:
         try:
-            if method == httpretty.GET:
-                response = await client.get(api_url, params=data, headers=headers)
-            elif method == httpretty.POST:
-                response = await client.post(
-                    api_url,
-                    data=json.dumps(data, default=date_time_json_serialize),
-                    headers=headers
-                )
-            return {'status_code': response.status_code, 'data': response.json()}
-        except Exception as exception_occurred:
-            if DEBUG_MODE:
-                print(exception_occurred)
-            return {'status_code': 500, 'data': INTERNAL_SERVER_ERROR_MESSAGE}
+            async for attempt in AsyncRetrying(stop=stop_after_attempt(retries), wait=wait_fixed(2)):
+                with attempt:
+                    if method == httpretty.GET:
+                        response = await client.get(api_url, params=data, headers=headers)
+                    elif method == httpretty.POST:
+                        response = await client.post(
+                            api_url,
+                            data=json.dumps(data, default=date_time_json_serialize),
+                            headers=headers
+                        )
+                    if response.status_code in STATUS_FORCE_LIST:
+                        response.raise_for_status()
+                    return {'status_code': response.status_code, 'data': response.json()}
+        except RetryError:
+            return {'status_code': INTERNAL_SERVER_STATUS_CODE, 'data': INTERNAL_SERVER_ERROR_MESSAGE}
